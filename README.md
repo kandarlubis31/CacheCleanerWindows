@@ -37,8 +37,8 @@ Sebuah aplikasi pembersih sistem Windows yang dirancang dengan antarmuka futuris
 
 ### Persiapan Awal
 
-  * **Unduh Aplikasi:**
-      * Buka bagian [**Releases**]([https://www.google.com/search?q=https://github.com/KandarLubis31/WinClearCache-Tool/releases](https://github.com/kandarlubis31/CacheCleanerWindows/releases/tag/v1.0.0)) di repositori ini dan unduh *file* `.exe` versi terbaru.
+ * **Unduh Aplikasi:**
+    * Buka bagian [**Releases**](https://github.com/KandarLubis31/CacheCleanerWindows/releases) di repositori ini dan unduh *file* `.exe` versi terbaru.
   * **Atau, jika Anda ingin menjalankan dari *source code* Python:**
       * Pastikan Anda memiliki [Python 3.10](https://www.python.org/downloads/) terinstal di sistem Anda.
       * Instal *library* yang diperlukan: `pip install tkinter tk font subprocess os shutil glob threading time ctypes webbrowser datetime` (beberapa sudah bawaan Python, tapi ini untuk memastikan semuanya ada).
