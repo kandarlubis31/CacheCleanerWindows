@@ -61,13 +61,15 @@ class WinClearCacheApp:
         self.cleaning_active = False
         self.stop_cleaning_event = threading.Event()
         self.admin_warning_shown = False
-        self.last_cleaned = "Never"
-        self.space_saved = "0 MB"
+        self.last_cleaned = "Never" # Akan diupdate setelah pembersihan pertama
+        self.space_saved = "0 KB" # Akan diupdate
         self.cleaning_stats = {
             'files_deleted': 0,
             'folders_cleaned': 0,
             'errors': 0
         }
+        # self.info_labels dan self.stats_labels akan diinisialisasi di fungsi create_..._section
+
 
     # --- UI Setup Functions ---
     def setup_ui(self):
@@ -101,10 +103,13 @@ class WinClearCacheApp:
         tk.Label(header_frame, text="└─────────────────────────────────────────┘", 
                  font=(self.main_font, 10), fg="#58a6ff", bg="#21262d").pack(pady=(0,10))
 
+        # --- PERBAIKAN DI SINI: Tambahkan Last Cleaned dan Space Saved ke info_data ---
         info_data = [
             ("User:", os.getlogin()),
             ("Author:", "KandarLubis"),
-            ("Github:", "github.com/KandarLubis31")
+            ("Github:", "github.com/KandarLubis31"),
+            ("Last Cleaned:", self.last_cleaned), # Pastikan ini ada
+            ("Space Saved:", self.space_saved) # Pastikan ini ada
         ]
 
         info_grid_frame = tk.Frame(header_frame, bg="#21262d")
@@ -112,10 +117,11 @@ class WinClearCacheApp:
         info_grid_frame.grid_columnconfigure(0, weight=0)
         info_grid_frame.grid_columnconfigure(1, weight=1)
 
-        self.info_labels = {} # Initialize info_labels here
+        self.info_labels = {} # Inisialisasi dictionary di sini
         for i, (label_text, value_text) in enumerate(info_data):
             tk.Label(info_grid_frame, text=label_text, font=(self.main_font, 9, "bold"), 
                      fg="#f0f6fc", bg="#21262d").grid(row=i, column=0, sticky="w", pady=1)
+            # Simpan referensi Label untuk diupdate nanti
             self.info_labels[label_text.strip(":")] = tk.Label(info_grid_frame, text=value_text, font=(self.main_font, 9), 
                                                                fg="#7dd3fc", bg="#21262d")
             self.info_labels[label_text.strip(":")].grid(row=i, column=1, sticky="w", padx=5, pady=1)
@@ -137,7 +143,7 @@ class WinClearCacheApp:
             ("Errors", "0", "#f85149")
         ]
 
-        self.stats_labels = {}
+        self.stats_labels = {} # Inisialisasi dictionary di sini
         for i, (label_text, initial_value, color) in enumerate(stats):
             stat_col_frame = tk.Frame(stats_frame, bg="#21262d")
             stat_col_frame.grid(row=0, column=i, padx=10, pady=10, sticky="nsew")
@@ -281,23 +287,21 @@ class WinClearCacheApp:
             self.log_message("Cleanup is already running.", "warning")
             return
 
-        # Periksa hak akses admin lagi sebelum memulai proses utama
         if not self.is_admin:
             self.log_message("[DENIED] Cleanup initiated without administrator privileges. Some operations will be skipped.", "error")
             # Tidak perlu pop-up lagi di sini, karena sudah di check_admin_privileges()
             # return # Uncomment ini jika Anda ingin sepenuhnya memblokir proses jika tidak admin
 
         self.cleaning_active = True
-        self.stop_cleaning_event.clear() # Reset event stop
-        self.clean_button.config(state='disabled', bg="#1f6feb") # Nonaktifkan dan ubah warna
-        self.stop_button.config(state='normal', bg="#da3633") # Aktifkan tombol stop
+        self.stop_cleaning_event.clear()
+        self.clean_button.config(state='disabled', bg="#1f6feb")
+        self.stop_button.config(state='normal', bg="#da3633")
         
         self.clear_logs()
         self.log_message("Cleanup protocol initiated.", "success")
         self.update_status("Initializing cleanup...", "#f1c40f")
         self.update_progress(5)
         
-        # Jalankan _start_cleaning_task di thread terpisah
         cleaning_thread = threading.Thread(target=self._start_cleaning_task, daemon=True)
         cleaning_thread.start()
 
@@ -305,10 +309,10 @@ class WinClearCacheApp:
         if not self.cleaning_active:
             self.log_message("Cleanup is not running.", "info")
             return
-        self.stop_cleaning_event.set() # Set event untuk memberi sinyal berhenti
-        self.cleaning_active = False # Ubah status aktif langsung
+        self.stop_cleaning_event.set()
+        self.cleaning_active = False
         self.update_status("Stopping cleanup...", "#f1c40f")
-        self.stop_button.config(state='disabled') # Nonaktifkan tombol stop
+        self.stop_button.config(state='disabled')
 
     def _start_cleaning_task(self):
         # Reset stats for new run
@@ -317,7 +321,7 @@ class WinClearCacheApp:
             'folders_cleaned': 0,
             'errors': 0
         }
-        self.space_saved = "0 MB"
+        self.space_saved = "0 KB" # Reset space saved
         self.update_stats_display() # Update display to 0s
 
         phases = [
@@ -335,13 +339,13 @@ class WinClearCacheApp:
         total_phases = len(phases)
         try:
             for i, (phase_name, phase_func) in enumerate(phases, 1):
-                if self.stop_cleaning_event.is_set(): # Periksa sinyal berhenti di setiap fase
+                if self.stop_cleaning_event.is_set():
                     self.log_message(f"Cleanup interrupted at phase: {phase_name}", "warning")
                     break
                     
                 self.log_message(f"\n--- PHASE {i}/{total_phases}: {phase_name} ---", "process")
                 self.update_status(f"Phase {i}/{total_phases}: {phase_name}", "#58a6ff")
-                self.update_progress( (i / total_phases) * 90 ) # Progress hingga 90% sebelum final
+                self.update_progress( (i / total_phases) * 90 )
                 
                 # Tambahkan pemeriksaan admin di sini juga jika fungsi tersebut memang butuh admin
                 if phase_name in ["Event Logs", "Disk Cleanup Tool", "DNS Cache"] and not self.is_admin:
@@ -350,7 +354,7 @@ class WinClearCacheApp:
                     phase_func()
                 time.sleep(0.1)
 
-            if self.cleaning_active and not self.stop_cleaning_event.is_set(): # Hanya jika tidak dihentikan
+            if self.cleaning_active and not self.stop_cleaning_event.is_set():
                 self.log_message("\n🎉 Cleanup Protocol Complete!", "success")
                 self.update_status("Cleanup completed successfully", "#3fb950")
                 self.update_progress(100)
@@ -432,22 +436,24 @@ class WinClearCacheApp:
 
     def update_info_labels(self):
         # This function updates the info labels in the header
-        self.info_labels["Last Cleaned"].config(text=self.last_cleaned)
-        self.info_labels["Space Saved"].config(text=self.space_saved)
+        # Ensure 'Last Cleaned' and 'Space Saved' keys exist before updating
+        if "Last Cleaned" in self.info_labels:
+            self.info_labels["Last Cleaned"].config(text=self.last_cleaned)
+        if "Space Saved" in self.info_labels:
+            self.info_labels["Space Saved"].config(text=self.space_saved)
 
 
     def update_stats_display(self):
         # Update labels in stats section
-        self.stats_labels["files_deleted"].config(text=f"{self.cleaning_stats['files_deleted']}")
-        self.stats_labels["folders_cleaned"].config(text=f"{self.cleaning_stats['folders_cleaned']}")
-        self.stats_labels["errors"].config(text=f"{self.cleaning_stats['errors']}")
+        if "files_deleted" in self.stats_labels:
+            self.stats_labels["files_deleted"].config(text=f"{self.cleaning_stats['files_deleted']}")
+        if "folders_cleaned" in self.stats_labels:
+            self.stats_labels["folders_cleaned"].config(text=f"{self.cleaning_stats['folders_cleaned']}")
+        if "errors" in self.stats_labels:
+            self.stats_labels["errors"].config(text=f"{self.cleaning_stats['errors']}")
         
-        # Update space saved (this is an estimation or hardcoded for now)
-        # To calculate actual space saved, each deletion operation needs to track file sizes.
-        # This is complex and might slow down deletion, so keeping it simple for now.
-        # For a true "space saved", you'd need to sum up sizes of deleted files.
-        # self.info_labels["Space Saved"].config(text=self.space_saved) # This is already in update_info_labels
-        
+        # update_info_labels is called separately for space saved/last cleaned
+
 
     def run_command(self, command, shell=False, check=False):
         if isinstance(command, str):
@@ -505,11 +511,11 @@ class WinClearCacheApp:
                                 # size = os.path.getsize(item_path) # For space calculation
                                 os.unlink(item_path)
                                 self.cleaning_stats['files_deleted'] += 1
-                                # self.space_saved += size
+                                # self.space_saved += size (if implementing space calculation)
                             elif os.path.isdir(item_path):
                                 shutil.rmtree(item_path)
-                                self.cleaning_stats['folders_cleaned'] += 1
-                            self.update_stats_display()
+                                self.cleaning_stats['folders_cleaned'] += 1 # Sub-folders also counted
+                            self.update_stats_display() # Update during deletion
                         except Exception as e:
                             if "_MEI" in item_path:
                                 self.log_message(f"Skipped PyInstaller temp: {item_name}", "warning")
@@ -518,7 +524,7 @@ class WinClearCacheApp:
                                 self.cleaning_stats['errors'] += 1
                                 self.update_stats_display()
                                 time.sleep(0.5)
-                                # raise # Do not re-raise, handle retry at directory level if needed
+                                # Do not re-raise, handle retry at directory level if needed
                             else:
                                 self.log_message(f"Failed to delete {item_name}: {e}", "warning")
                                 self.cleaning_stats['errors'] += 1
