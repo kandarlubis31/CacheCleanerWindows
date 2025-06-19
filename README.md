@@ -29,7 +29,7 @@ Selamat datang di **WinClearCache Tool - DarkMatter**\! Sebuah aplikasi pembersi
 
 ## 📸 Tampilan Aplikasi
 
-*(Ganti URL ini dengan tautan ke screenshot aplikasi Anda di repository GitHub setelah Anda mengunggahnya)*
+![image](https://github.com/user-attachments/assets/c086a47e-792a-4fa6-b735-bfe059cc860f)
 
 -----
 
