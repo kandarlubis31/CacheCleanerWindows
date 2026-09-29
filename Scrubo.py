@@ -21,6 +21,11 @@ try:
 except ImportError:
     psutil = None  # Fallback handling jika psutil belum diinstall
 
+try:
+    import dev_cleaner_core as dvc
+except ImportError:
+    dvc = None  # Dev Artifacts Cleaner opsional
+
 class ScruboApp:
     """
     Kelas utama aplikasi Scrubo.
@@ -297,10 +302,15 @@ class ScruboApp:
         self.scheduler_tab = tk.Frame(self.notebook, bg=self.bg_color)
         self.notebook.add(self.scheduler_tab, text="Penjadwalan / Scheduler")
         
+        # Create dev artifacts cleaner tab
+        self.dev_tab = tk.Frame(self.notebook, bg=self.bg_color)
+        self.notebook.add(self.dev_tab, text="Dev Artifacts")
+        
         # Setup UI for each tab
         self.setup_main_tab_ui()
         self.setup_info_tab_ui()
         self.setup_scheduler_tab_ui()
+        self.setup_dev_tab_ui()
 
     def setup_main_tab_ui(self):
         """Setup UI for the main cleaning tab"""
@@ -602,6 +612,222 @@ class ScruboApp:
             self.schedule_freq_var.set(self.settings.get('schedule_frequency', 'weekly'))
             self.schedule_time_var.set(self.settings.get('schedule_time', '00:00'))
             self.start_scheduler()
+
+    # ============================================================
+    #  DEV ARTIFACTS CLEANER TAB
+    # ============================================================
+
+    def setup_dev_tab_ui(self):
+        """Setup UI untuk tab Dev Artifacts (build cache cleaner)"""
+        for i in range(6):
+            self.dev_tab.grid_rowconfigure(i, weight=0 if i != 3 else 1)
+        self.dev_tab.grid_columnconfigure(0, weight=1)
+
+        if dvc is None:
+            tk.Label(self.dev_tab, text="dev_cleaner_core.py tidak ditemukan!",
+                     fg="red", bg=self.bg_color).pack(pady=20)
+            return
+
+        # Title
+        title_frame = tk.Frame(self.dev_tab, bg=self.card_bg, bd=1, relief="solid",
+                               highlightbackground="#dadce0")
+        title_frame.grid(row=0, column=0, sticky="ew", pady=(0, 10))
+        gradient_frame = tk.Frame(title_frame, bg=self.accent_color, height=50)
+        gradient_frame.pack(fill=tk.X)
+        tk.Label(gradient_frame, text="🧹 Dev Artifacts Cleaner",
+                 font=(self.main_font, 16, "bold"),
+                 fg="white", bg=self.accent_color).pack(pady=10)
+
+        # Options
+        options_frame = tk.Frame(self.dev_tab, bg=self.card_bg, bd=1, relief="solid",
+                                 highlightbackground="#dadce0")
+        options_frame.grid(row=1, column=0, sticky="ew", pady=(0, 10))
+
+        tk.Label(options_frame, text="Hapus artifact yang tidak aktif selama (hari):",
+                 font=(self.main_font, 10), fg=self.text_color,
+                 bg=self.card_bg).pack(side=tk.LEFT, padx=(15, 8), pady=12)
+
+        self.dev_age_var = tk.IntVar(value=30)
+        age_spin = tk.Spinbox(options_frame, from_=7, to=180,
+                              textvariable=self.dev_age_var, width=5,
+                              font=(self.main_font, 10))
+        age_spin.pack(side=tk.LEFT, padx=(0, 15), pady=12)
+
+        self.dev_scan_btn = tk.Button(options_frame, text="🔍 Scan",
+                                      command=self.run_dev_scan,
+                                      bg=self.accent_color, fg="white",
+                                      activebackground=self.accent_hover, bd=0,
+                                      relief="flat", padx=18, pady=6, cursor="hand2")
+        self.dev_scan_btn.pack(side=tk.LEFT, padx=(0, 8), pady=12)
+
+        self.dev_clean_btn = tk.Button(options_frame, text="🧹 Bersihkan",
+                                       command=self.run_dev_clean, state=tk.DISABLED,
+                                       bg=self.success_color, fg="white",
+                                       activebackground=self.accent_hover, bd=0,
+                                       relief="flat", padx=18, pady=6, cursor="hand2")
+        self.dev_clean_btn.pack(side=tk.LEFT, pady=12)
+
+        self.dev_addroot_btn = tk.Button(options_frame, text="📁 + Folder",
+                                         command=self.dev_add_root,
+                                         bg=self.card_bg, fg=self.text_color,
+                                         activebackground=self.accent_hover, bd=1,
+                                         relief="flat", padx=14, pady=6, cursor="hand2")
+        self.dev_addroot_btn.pack(side=tk.LEFT, padx=(8, 0), pady=12)
+
+        # Roots info label
+        self.dev_roots_label = tk.Label(options_frame, text="",
+                                        font=(self.main_font, 8),
+                                        fg=self.text_secondary, bg=self.card_bg,
+                                        wraplength=400, justify=tk.LEFT)
+        self.dev_roots_label.pack(side=tk.LEFT, padx=(10, 5), pady=4)
+        self.update_dev_roots_label()
+
+        # Results table
+        results_frame = tk.Frame(self.dev_tab, bg=self.card_bg, bd=1, relief="solid",
+                                 highlightbackground="#dadce0")
+        results_frame.grid(row=2, column=0, sticky="nsew", pady=(0, 10))
+
+        columns = ("path", "size", "age", "status")
+        self.dev_tree = ttk.Treeview(results_frame, columns=columns, show="headings", height=10)
+        self.dev_tree.heading("path", text="Lokasi / Path")
+        self.dev_tree.heading("size", text="Ukuran")
+        self.dev_tree.heading("age", text="Umur (hari)")
+        self.dev_tree.heading("status", text="Status")
+        self.dev_tree.column("path", width=380)
+        self.dev_tree.column("size", width=90, anchor="e")
+        self.dev_tree.column("age", width=80, anchor="center")
+        self.dev_tree.column("status", width=140)
+
+        dev_scroll = ttk.Scrollbar(results_frame, orient=tk.VERTICAL, command=self.dev_tree.yview)
+        self.dev_tree.configure(yscrollcommand=dev_scroll.set)
+        self.dev_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(8, 0), pady=8)
+        dev_scroll.pack(side=tk.RIGHT, fill=tk.Y, pady=8, padx=(0, 8))
+
+        # Summary
+        self.dev_summary_label = tk.Label(self.dev_tab,
+                                          text="Klik Scan untuk mencari build artifacts lama (node_modules, .next, dist, build...)",
+                                          font=(self.main_font, 10, "bold"),
+                                          fg=self.text_secondary, bg=self.card_bg)
+        self.dev_summary_label.grid(row=3, column=0, sticky="ew", pady=(0, 8))
+
+        # Safety note
+        note_frame = tk.Frame(self.dev_tab, bg=self.card_bg, bd=1, relief="solid",
+                              highlightbackground="#dadce0")
+        note_frame.grid(row=4, column=0, sticky="ew", pady=(0, 10))
+        tk.Label(note_frame,
+                 text="🛡️ Aman: artifact = folder yang regenerate otomatis. Tidak menyentuh .git, .env, "
+                      "source code. Project aktif (<umur threshold) & project dengan flag .no-clean di-skip.",
+                 font=(self.main_font, 9),
+                 fg=self.text_secondary, bg=self.card_bg,
+                 wraplength=800, justify=tk.LEFT).pack(padx=12, pady=8, fill=tk.X)
+
+    def update_dev_roots_label(self):
+        """Update label daftar roots yang discan"""
+        if dvc is None:
+            return
+        roots = dvc.get_roots()
+        if roots:
+            shown = '\n'.join(r for r in roots[:3])
+            extra = len(roots) - 3
+            text = shown + (f"\n+{extra} lainnya" if extra > 0 else "")
+            self.dev_roots_label.config(text=text)
+        else:
+            self.dev_roots_label.config(
+                text="Belum ada folder project. Klik + Folder")
+
+    def dev_add_root(self):
+        """Buka dialog pilih folder project, simpan ke config"""
+        from tkinter import filedialog
+        path = filedialog.askdirectory(
+            title="Pilih folder project (misal: C:\\Users\\kamu\\Projects)")
+        if path:
+            dvc.add_root(path)
+            self.update_dev_roots_label()
+            self.log_message(f"✓ Folder project ditambahkan: {path}", "success")
+
+    def run_dev_scan(self):
+        """Scan artifacts di background thread"""
+        self.dev_scan_btn.config(state=tk.DISABLED)
+        self.dev_clean_btn.config(state=tk.DISABLED)
+        self.dev_summary_label.config(text="⏳ Scanning...")
+        threading.Thread(target=self.dev_scan_worker, daemon=True).start()
+
+    def dev_scan_worker(self):
+        try:
+            result = dvc.find_artifacts(age_days=self.dev_age_var.get())
+            self.master.after(0, lambda: self.dev_scan_done(result))
+        except Exception as e:
+            self.master.after(0, lambda: self.dev_summary_label.config(
+                text=f"❌ Error scan: {str(e)[:80]}"))
+            self.master.after(0, lambda: self.dev_scan_btn.config(state=tk.NORMAL))
+
+    def dev_scan_done(self, result):
+        """Tampilkan hasil scan ke tabel (dipanggil dari main thread)"""
+        self.dev_scan_result = result
+        self.dev_tree.delete(*self.dev_tree.get_children())
+
+        for art in result.artifacts:
+            if art.is_cleanable:
+                status, tag = "BOLEH HAPUS", "cleanable"
+            else:
+                status, tag = f"SKIP ({art.reason_skip})", "skip"
+            self.dev_tree.insert("", tk.END, iid=art.path, tags=(tag,),
+                                 values=(art.path, f"{art.size_mb:.0f} MB",
+                                         art.age_days, status))
+
+        self.dev_tree.tag_configure("cleanable", foreground=self.success_color)
+        self.dev_tree.tag_configure("skip", foreground=self.text_secondary)
+
+        self.dev_summary_label.config(
+            text=f"📊 {result.total_cleanable} artifact bisa dibersihkan "
+                 f"({result.total_size_cleanable / (1024*1024):.0f} MB) "
+                 f"dari {len(result.artifacts)} yang ketemu")
+
+        self.dev_scan_btn.config(state=tk.NORMAL)
+        if result.total_cleanable > 0:
+            self.dev_clean_btn.config(state=tk.NORMAL)
+
+    def run_dev_clean(self):
+        """Konfirmasi lalu bersihkan artifact yang cleanable"""
+        if not hasattr(self, 'dev_scan_result') or self.dev_scan_result is None:
+            return
+
+        n = self.dev_scan_result.total_cleanable
+        mb = self.dev_scan_result.total_size_cleanable / (1024 * 1024)
+        answer = messagebox.askyesno(
+            "Konfirmasi Pembersihan",
+            f"Hapus {n} build artifact ({mb:.0f} MB)?\n\n"
+            f"Ini AMAN: artifact akan regenerate otomatis saat build ulang.\n"
+            f"Project aktif & yang berflag .no-clean tidak disentuh.")
+        if not answer:
+            return
+
+        self.dev_clean_btn.config(state=tk.DISABLED)
+        self.dev_summary_label.config(text="🧹 Membersihkan...")
+        threading.Thread(target=self.dev_clean_worker, daemon=True).start()
+
+    def dev_clean_worker(self):
+        try:
+            stats = dvc.execute_clean(self.dev_scan_result)
+            self.master.after(0, lambda: self.dev_clean_done(stats))
+        except Exception as e:
+            self.master.after(0, lambda: self.dev_summary_label.config(
+                text=f"❌ Error: {str(e)[:80]}"))
+            self.master.after(0, lambda: self.dev_clean_btn.config(state=tk.NORMAL))
+
+    def dev_clean_done(self, stats):
+        """Update UI setelah pembersihan selesai"""
+        freed_mb = stats['bytes_freed'] / (1024 * 1024)
+        self.dev_summary_label.config(
+            text=f"✅ Selesai: {stats['cleaned']} dihapus, {stats['failed']} gagal "
+                 f"(locked), {freed_mb:.0f} MB dibebaskan")
+        self.dev_clean_btn.config(state=tk.DISABLED)
+        self.dev_scan_btn.config(state=tk.NORMAL)
+        messagebox.showinfo(
+            "Pembersihan Selesai",
+            f"{stats['cleaned']} artifact dibersihkan!\n"
+            f"{freed_mb:.0f} MB ruang disk dibebaskan.\n\n"
+            f"Catatan: artifact akan regenerate saat build ulang project.")
 
     def create_header(self, parent):
         header_frame = tk.Frame(parent, bg=self.card_bg, bd=1, relief="solid", highlightbackground="#dadce0")

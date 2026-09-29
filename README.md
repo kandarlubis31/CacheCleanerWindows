@@ -1,28 +1,68 @@
+# Scrubo - Pembersih Sistem & Browser
 
-### Perubahan yang Saya Lakukan:
+Aplikasi pembersih Windows untuk end-user **dan developer**.
 
-1. **Nama Aplikasi**: Mengubah dari "WinClearCache Tool - DarkMatter" menjadi "Scrubo - Pembersih Sistem & Browser" yang lebih mencerminkan fungsi dan identitas aplikasi saat ini.
+## Fitur
 
-2. **Deskripsi Tema**: Memperbarui deskripsi dari "futuristik, minimalis, dan *dark matter*" menjadi "modern, bersih, dan *user-friendly*" untuk mencerminkan perubahan tema dari gelap ke terang.
+- 🧹 **Pembersihan / Cleaning** — cache browser & sistem dengan proteksi data login
+- ℹ️ **Info Sistem / System Info** — monitoring storage & hardware
+- ⏰ **Penjadwalan / Scheduler** — pembersihan otomatis terjadwal
+- 🛠️ **Dev Artifacts** — pembersih build cache developer (`node_modules`, `.next`, `dist`, `build`, `__pycache__`) dengan pengaman berlapis:
+  - **Age-based**: cuma hapus artifact yang tidak aktif N hari (default 30, bisa diatur 7–180)
+  - **Dry-run scan**: lihat dulu daftar + ukuran sebelum hapus, konfirmasi dulu
+  - **Project aktif aman**: project yang masih dikerjakan otomatis ke-skip
+  - **Flag `.no-clean`**: bikin file kosong `.no-clean` di root project untuk protect permanen
+  - **Tidak pernah menyentuh**: `.git`, `.env`, source code, `package-lock.json`, database
 
-3. **Fitur-Fitur Baru**: Menambahkan deskripsi untuk fitur-fitur baru:
-   - Tab Info Sistem
-   - Tab Penjadwalan
-   - Keamanan data login
-   - Dukungan bilingual
+## Tech Stack
 
-4. **Struktur README**: Menata ulang struktur dengan heading yang lebih jelas dan deskripsi yang lebih detail untuk setiap fitur.
+Python (Tkinter) — tanpa dependency wajib eksternal
 
-5. **Cara Penggunaan**: Memperbarui instruksi penggunaan untuk mencerminkan antarmuka baru dengan sistem tab.
+## Struktur Utama
 
-6. **Bagian Pengaturan Lanjutan**: Menambahkan bagian baru yang menjelaskan berbagai opsi pengaturan yang tersedia.
+```
+Scrubo.py              # App utama (4 tab)
+dev_cleaner_core.py    # Core logic Dev Artifacts Cleaner (reusable, bisa dipake project lain)
+Scrubo.spec            # PyInstaller build config
+Scrubo.ico
+```
 
-7. **Pemecahan Masalah**: Memperluas bagian troubleshooting dengan solusi untuk masalah yang lebih spesifik.
+## Menjalankan
 
-8. **Tips Tambahan**: Menambahkan bagian tips untuk penggunaan yang lebih optimal.
+```bash
+python Scrubo.py
+```
 
-9. **Link yang Diperbarui**: Memastikan semua link merujuk ke repositori yang benar.
+## Build .exe
 
-10. **Format Markdown**: Memperbaiki formatting markdown untuk konsistensi dan keterbacaan yang lebih baik.
+```bash
+pip install pyinstaller
+pyinstaller Scrubo.spec
+# hasil: dist/Scrubo.exe
+```
 
-README.md ini sekarang lebih komprehensif dan mencerminkan dengan akurat fitur-fitur dan kemampuan aplikasi Scrubo versi terbaru.
+## Dev Artifacts Cleaner sebagai CLI (tanpa GUI)
+
+```bash
+python dev_cleaner_core.py          # dry-run
+python dev_cleaner_core.py --go     # eksekusi
+```
+
+## Integrasi ke Project Lain
+
+```python
+import dev_cleaner_core as dvc
+
+result = dvc.find_artifacts(roots=[r'C:\Projects'], age_days=30)
+print(result.summary())
+# ... tampilkan ke user, konfirmasi ...
+stats = dvc.execute_clean(result, progress_cb=print)
+```
+
+---
+
+*Generated: 2026-08-08 · Path: python\CacheCleanerWindows\CacheCleanerWindows*
+
+---
+
+Lihat `CONTEXT.md` di folder ini untuk detail arsitektur.
