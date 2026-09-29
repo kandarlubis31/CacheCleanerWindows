@@ -175,3 +175,11 @@ ehthumbs.db
 *.tmp
 
 Scrubo.ico
+# === PROJECT SPECIFIC ===
+# Spec & icon WAJIB ikut repo (dibutuhin buat build) — jangan di-ignore
+!Scrubo.spec
+!Scrubo.ico
+!*.ico
+!*.spec
+# Exe & hasil build tetap di-ignore
+dist/
