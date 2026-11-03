@@ -59,10 +59,6 @@ print(result.summary())
 stats = dvc.execute_clean(result, progress_cb=print)
 ```
 
----
+## Lisensi
 
-*Generated: 2026-08-08 · Path: python\CacheCleanerWindows\CacheCleanerWindows*
-
----
-
-Lihat `CONTEXT.md` di folder ini untuk detail arsitektur.
+Lihat `LICENSE` di repository ini.
